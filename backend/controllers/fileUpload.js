@@ -1,53 +1,43 @@
-// Import necessary modules
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import fs from 'fs';
+// import fs from 'fs';
 import { parseResume } from '../utils/parser.js'; // Ensure this path is correct
+import natural from 'natural'; // Import the natural NLP library
 
 // Set up __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// File upload handler
-// Function to calculate ATS score
+// Function to calculate ATS score based on matching important words
 const calculateATSScore = (resumeKeywords, jobDescriptionKeywords) => {
-    const matchedKeywords = resumeKeywords.filter(keyword => jobDescriptionKeywords.includes(keyword));
-    const score = (matchedKeywords.length / jobDescriptionKeywords.length) * 100; // Percentage score
+    const normalizedResumeKeywords = resumeKeywords.map(keyword => keyword.toLowerCase());
+    const normalizedJobDescriptionKeywords = jobDescriptionKeywords.map(keyword => keyword.toLowerCase());
+    
+    const matchedKeywords = normalizedResumeKeywords.filter(keyword => normalizedJobDescriptionKeywords.includes(keyword));
+    const score = (matchedKeywords.length / normalizedJobDescriptionKeywords.length) * 100; // Percentage score
+
     return {
         score,
         matchedKeywords,
-        totalKeywords: jobDescriptionKeywords.length,
+        totalKeywords: normalizedJobDescriptionKeywords.length,
         matchedCount: matchedKeywords.length
     };
 };
 
+// Function to calculate TF-IDF scores and return important words based on a threshold
+const calculateTFIDF = (textArray, threshold = 1.2) => {  // Default threshold for filtering
+    const tfidf = new natural.TfIdf();
+    textArray.forEach(text => tfidf.addDocument(text));
 
-const extractKeywords = (text) => {
-    // Convert text to lower case, split into words, and filter out common stop words
-    const stopWords = new Set([
-        "i", "me", "my", "we", "our", "ours", "you", "your", "yours", "he", "him", 
-        "his", "she", "her", "it", "its", "they", "them", "their", "theirs", 
-        "that", "what", "who", "whom", "this", "these", "those", "am", "is", 
-        "are", "was", "were", "be", "been", "being", "have", "has", "had", 
-        "do", "does", "did", "doing", "a", "an", "the", "and", "or", "but", 
-        "if", "then", "because", "as", "for", "at", "by", "with", "about", 
-        "against", "between", "into", "through", "during", "before", "after", 
-        "above", "below", "to", "from", "up", "down", "in", "out", "on", 
-        "off", "over", "under", "again", "further", "then", "once", "here", 
-        "there", "when", "where", "why", "how", "all", "any", "both", 
-        "each", "few", "more", "most", "other", "some", "such", "no", 
-        "nor", "not", "only", "own", "same", "so", "than", "too", "very", 
-        "s", "t", "can", "will", "just"
-    ]);
+    const importantWords = [];
+    tfidf.listTerms(0).forEach(item => {
+        if (item.tfidf >= threshold) {
+            importantWords.push(item.term);
+        }
+    });
 
-    const words = text
-        .toLowerCase()                       // Convert text to lower case
-        .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '') // Remove punctuation
-        .split(/\s+/)                        // Split by whitespace
-        .filter(word => word && !stopWords.has(word)); // Filter out stop words and empty strings
-
-    return [...new Set(words)]; // Return unique keywords
+    return importantWords;
 };
 
 // File upload handler
@@ -68,24 +58,25 @@ export const handleFileUpload = async (req, res) => {
         
         // Log the extracted resume text for debugging
         console.log('Extracted Resume Text:', resumeText);
-       
-        // Extract keywords from both the resume and job description
-        const resumeKeywords = extractKeywords(resumeText);
-        const jobDescriptionKeywords = extractKeywords(req.body.jobDescription);
+        console.log('Job Description:', req.body.jobDescription);
 
-        console.log('Resume Keywords:', resumeKeywords);
-        console.log('Job Description Keywords:', jobDescriptionKeywords);
+        // Extract important words from both resume and job description using TF-IDF
+        const resumeImportantWords = calculateTFIDF([resumeText]);  // Important words from resume
+        const jobDescriptionImportantWords = calculateTFIDF([req.body.jobDescription]);  // Important words from JD
 
-        // Calculate ATS score
-        const atsScore = calculateATSScore(resumeKeywords, jobDescriptionKeywords);
+        console.log('Resume Important Words:', resumeImportantWords);
+        console.log('Job Description Important Words:', jobDescriptionImportantWords);
+
+        // Calculate ATS score based on matching important words
+        const atsScore = calculateATSScore(resumeImportantWords, jobDescriptionImportantWords);
         console.log('ATS Score:', atsScore);
 
         // Send the response with extracted data and ATS score
         res.send({
-            message: 'File and job description processed successfully',
-            extractedText: resumeText, // Return the extracted text from the resume
-            jobDescription: req.body.jobDescription, // Include the job description
-            atsScore // Include the ATS score
+            atsScore, 
+            matchedKeywords: atsScore.matchedKeywords,
+            totalKeywords: atsScore.totalKeywords,
+            matchedCount: atsScore.matchedCount
         });
     } catch (error) {
         console.error('Error processing upload:', error);
