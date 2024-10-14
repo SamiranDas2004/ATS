@@ -1,17 +1,25 @@
-// utils/parser.js
 import fs from 'fs';
-import pdf from 'pdf-parse';
+import { getDocument } from 'pdfjs-dist';
 
-// Function to parse the resume and extract text
 export const parseResume = async (filePath) => {
-    // Check if the file exists
-    if (!filePath) {
-        throw new Error(`File not found at path: ${filePath}`);
+    try {
+        const data = new Uint8Array(fs.readFileSync(filePath));
+        const pdfDocument = await getDocument({ data }).promise;
+        let extractedText = '';
+
+        // Loop through each page and extract text
+        for (let i = 1; i <= pdfDocument.numPages; i++) {
+            const page = await pdfDocument.getPage(i);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map(item => item.str).join(' ');
+            extractedText += textItems + '\n';
+        }
+
+        console.log("Extracted Text:", extractedText);
+        return extractedText;
+    } catch (error) {
+        console.error("Error:", error.message);
     }
-
-    const dataBuffer = fs.readFileSync(filePath); // Read the file as a buffer
-console.log("sex",dataBuffer);
-
-    // Use pdf-parse to extract text from the PDF
-  
 };
+
+
