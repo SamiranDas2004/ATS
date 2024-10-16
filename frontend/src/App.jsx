@@ -5,6 +5,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [jobDescription, setJobDescription] = useState(''); // Initialize with an empty string
   const [atsScore,setAtsScore]=useState(null)
+  const [matchedKeyWords,setMatchesKeyWords]=useState([])
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
@@ -24,7 +25,7 @@ function App() {
           },
         });
         setAtsScore(response.data.atsScore.score)
-        console.log(response.data.atsScore.score);
+       
 
         
         // Handle success

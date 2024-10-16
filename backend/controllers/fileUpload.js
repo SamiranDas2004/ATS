@@ -26,7 +26,7 @@ const calculateATSScore = (resumeKeywords, jobDescriptionKeywords) => {
 };
 
 // Function to calculate TF-IDF scores and return important words based on a threshold
-const calculateTFIDF = (textArray, threshold = 1.2) => {  // Default threshold for filtering
+const calculateTFIDF = (textArray, threshold = 0.1) => {  // Default threshold for filtering
     const tfidf = new natural.TfIdf();
     textArray.forEach(text => tfidf.addDocument(text));
 
