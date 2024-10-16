@@ -1,32 +1,107 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-// import fs from 'fs';
-import { parseResume } from '../utils/parser.js'; // Ensure this path is correct
-import natural from 'natural'; // Import the natural NLP library
+import natural from 'natural'; // Import natural language processing
+import stopword from 'stopword'; // For stopword removal
+import { parseResume } from '../utils/parser.js'; // Your resume parser
 
 // Set up __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Function to calculate ATS score based on matching important words
-const calculateATSScore = (resumeKeywords, jobDescriptionKeywords) => {
+// WordNet for synonym lookup
+const wordnet = new natural.WordNet();
+const getSynonyms = async (word) => {
+    return new Promise((resolve, reject) => {
+        wordnet.lookup(word, (err, definitions) => {
+            if (err) {
+                reject(err);
+            } else {
+                const synonyms = definitions.flatMap(def => def.synonyms);
+                resolve(synonyms);
+            }
+        });
+    });
+};
+
+// Function to generate N-grams from text
+const generateNGrams = (text, n = 2) => {
+    const tokenizer = new natural.WordTokenizer();
+    const tokens = tokenizer.tokenize(text);
+    return natural.NGrams.ngrams(tokens, n).map(ngram => ngram.join(' '));
+};
+
+// Function to remove stopwords from text
+const removeStopWords = (text) => {
+    const tokenizer = new natural.WordTokenizer();
+    const tokens = tokenizer.tokenize(text);
+    return stopword.removeStopwords(tokens);
+};
+// Function to calculate ATS score with synonyms, N-grams, and weighting
+// Function to calculate ATS score with synonyms, N-grams, and weighting
+const calculateATSScore = async (resumeKeywords, jobDescriptionKeywords, resumeText) => {
     const normalizedResumeKeywords = resumeKeywords.map(keyword => keyword.toLowerCase());
     const normalizedJobDescriptionKeywords = jobDescriptionKeywords.map(keyword => keyword.toLowerCase());
+
+    // Log normalized keywords for debugging
+    console.log('Normalized Resume Keywords:', normalizedResumeKeywords);
+    console.log('Normalized Job Description Keywords:', normalizedJobDescriptionKeywords);
+
+    // Initial match of keywords
+    let matchedKeywords = normalizedResumeKeywords.filter(keyword => normalizedJobDescriptionKeywords.includes(keyword));
     
-    const matchedKeywords = normalizedResumeKeywords.filter(keyword => normalizedJobDescriptionKeywords.includes(keyword));
-    const score = (matchedKeywords.length / normalizedJobDescriptionKeywords.length) * 100; // Percentage score
+    // Log matched keywords
+    console.log('Initially Matched Keywords:', matchedKeywords);
+
+    // Parallelize synonym lookups for performance and handle empty results
+    const synonymPromises = normalizedResumeKeywords.map(async (keyword) => {
+        try {
+            const synonyms = await getSynonyms(keyword);
+            if (synonyms.length > 0) {
+                console.log(`Synonyms for "${keyword}":`, synonyms);
+                return synonyms.filter(synonym => normalizedJobDescriptionKeywords.includes(synonym.toLowerCase()));
+            }
+            return []; // Return empty array if no synonyms are found
+        } catch (err) {
+            console.error(`Error getting synonyms for "${keyword}":`, err);
+            return []; // Return empty array on error
+        }
+    });
+
+    // Await all synonym matching
+    const synonymMatches = await Promise.all(synonymPromises);
+
+    // Flatten and concatenate synonym matches with matched keywords
+    matchedKeywords = matchedKeywords.concat(synonymMatches.flat());
+    
+    // Log after adding synonym matches
+    console.log('Matched Keywords After Synonym Matching:', matchedKeywords);
+
+    // Apply weighting based on sections
+    const weightedMatchedKeywords = resumeKeywords.reduce((acc, keyword) => {
+        const weight = getSectionWeight(keyword, resumeText);
+        return acc + (normalizedJobDescriptionKeywords.includes(keyword.toLowerCase()) ? weight : 0);
+    }, 0);
+
+    // Log weighted matched keywords for debugging
+    console.log('Weighted Matched Keywords:', weightedMatchedKeywords);
+
+    const score = (weightedMatchedKeywords / normalizedJobDescriptionKeywords.length) * 100; // Weighted score
 
     return {
         score,
         matchedKeywords,
         totalKeywords: normalizedJobDescriptionKeywords.length,
-        matchedCount: matchedKeywords.length
+        matchedCount: matchedKeywords.length // Count of all matched keywords
     };
 };
 
-// Function to calculate TF-IDF scores and return important words based on a threshold
-const calculateTFIDF = (textArray, threshold = 0.1) => {  // Default threshold for filtering
+
+// Function to get synonyms for a keyword using WordNet
+
+
+// Function to calculate TF-IDF scores and return important words
+const calculateTFIDF = (textArray, threshold = 0.1) => {
     const tfidf = new natural.TfIdf();
     textArray.forEach(text => tfidf.addDocument(text));
 
@@ -40,44 +115,62 @@ const calculateTFIDF = (textArray, threshold = 0.1) => {  // Default threshold f
     return importantWords;
 };
 
+// Function to get section weight based on the keyword's occurrence in a resume section
+const getSectionWeight = (keyword, text) => {
+    const sectionWeights = {
+        "Skills": 2,    // Skills section is more important
+        "Experience": 1.5,
+        "Education": 1   // Default weight
+    };
+    const sections = Object.keys(sectionWeights);
+
+    for (const section of sections) {
+        if (text.includes(section)) {
+            return sectionWeights[section];
+        }
+    }
+
+    return 1; // Default weight
+};
+
 // File upload handler
 export const handleFileUpload = async (req, res) => {
     if (!req.file || !req.body.jobDescription) {
         return res.status(400).send('Please upload both file and job description.');
     }
 
-    console.log('File uploaded:', req.file);
-    console.log('Job description:', req.body.jobDescription); // Log the actual job description
-
     // Path to the uploaded resume
-    const resumeFilePath = path.join(__dirname, '..', req.file.path); // Ensure this path is correct
+    const resumeFilePath = path.join(__dirname, '..', req.file.path);
 
     try {
         // Parse the resume to extract text
         const resumeText = await parseResume(resumeFilePath);
+        console.log("resume Text",resumeText);
         
-        // Log the extracted resume text for debugging
-        console.log('Extracted Resume Text:', resumeText);
-        console.log('Job Description:', req.body.jobDescription);
+        // Remove stopwords from both resume and job description
+        const cleanResumeText = removeStopWords(resumeText).join(' ');
+        console.log("text 2",cleanResumeText);
+        
+        const cleanJobDescriptionText = removeStopWords(req.body.jobDescription).join(' ');
+        console.log("text ",cleanJobDescriptionText);
+        // Extract important words using TF-IDF and N-grams
+        const resumeImportantWords = calculateTFIDF([cleanResumeText]).concat(generateNGrams(cleanResumeText, 2));
+        const jobDescriptionImportantWords = calculateTFIDF([cleanJobDescriptionText]).concat(generateNGrams(cleanJobDescriptionText, 2));
+console.log(resumeImportantWords);
+console.log(jobDescriptionImportantWords);
 
-        // Extract important words from both resume and job description using TF-IDF
-        const resumeImportantWords = calculateTFIDF([resumeText]);  // Important words from resume
-        const jobDescriptionImportantWords = calculateTFIDF([req.body.jobDescription]);  // Important words from JD
 
-        console.log('Resume Important Words:', resumeImportantWords);
-        console.log('Job Description Important Words:', jobDescriptionImportantWords);
+        // Calculate ATS score with synonyms and weights
+        const atsScore = await calculateATSScore(resumeImportantWords, jobDescriptionImportantWords, cleanResumeText);
+console.log(atsScore);
 
-        // Calculate ATS score based on matching important words
-        const atsScore = calculateATSScore(resumeImportantWords, jobDescriptionImportantWords);
-        console.log('ATS Score:', atsScore);
-
-        // Send the response with extracted data and ATS score
+        // Send response
         res.send({
-            atsScore, 
+            atsScore,
             matchedKeywords: atsScore.matchedKeywords,
             totalKeywords: atsScore.totalKeywords,
             matchedCount: atsScore.matchedCount
-        });
+        })
     } catch (error) {
         console.error('Error processing upload:', error);
         res.status(500).send('Error processing the uploaded file or job description.');

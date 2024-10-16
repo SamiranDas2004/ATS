@@ -40,7 +40,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-white shadow-md rounded-lg p-8 max-w-lg w-full">
         <h1 className="text-2xl font-bold mb-6 text-gray-700">Upload Your Resume</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
