@@ -1,37 +1,39 @@
 import React, { useState } from 'react';
-import axios from 'axios'; // Import Axios
+import axios from 'axios';
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [jobDescription, setJobDescription] = useState(''); // Initialize with an empty string
-  const [atsScore,setAtsScore]=useState(null)
-  const [matchedKeyWords,setMatchesKeyWords]=useState([])
+  const [jobDescription, setJobDescription] = useState('');
+  const [atsScore, setAtsScore] = useState(null);
+  const [missedKeyWords, setMissedKeyWords] = useState([]);
+
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (selectedFile && jobDescription) { // Ensure both file and description are provided
-      const formData = new FormData(); // Create a FormData object
-      formData.append('file', selectedFile); // Append the selected file to the form data
-      formData.append('jobDescription', jobDescription); // Append job description
+    if (selectedFile && jobDescription) {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('jobDescription', jobDescription);
 
       try {
-        // Send a POST request to the server
         const response = await axios.post('http://localhost:5000/api/upload', formData, {
           headers: {
-            'Content-Type': 'multipart/form-data', // Set the content type to multipart/form-data
+            'Content-Type': 'multipart/form-data',
           },
         });
-        setAtsScore(response.data.atsScore.score)
-       
+console.log(response.data);
 
+        setAtsScore(response.data.atsScore.score);
         
-        // Handle success
-        console.log('File uploaded successfully:', response.data);
+        // Use Set to remove duplicate keywords
+        const uniqueKeywords = [...new Set(response.data.atsScore.missingKeywords)];
+        setMissedKeyWords(uniqueKeywords);
+        console.log(response.data);
+        
       } catch (error) {
-        // Handle error
         console.error('Error uploading file:', error);
       }
     } else {
@@ -40,8 +42,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-white shadow-md rounded-lg p-8 max-w-lg w-full">
+    <div className="min-h-screen flex items-center justify-center pt-5 bg-gray-900">
+      <div className="bg-white shadow-md rounded-lg p-8 max-w-2xl w-full"> {/* Increased the max-w-lg to max-w-2xl */}
         <h1 className="text-2xl font-bold mb-6 text-gray-700">Upload Your Resume</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -71,7 +73,10 @@ function App() {
             >
               Upload
             </button>
-            <div>your score is {atsScore}</div>
+            <div className="mt-4">
+              <div className='font-bold'>Your ATS score is: {atsScore !== null ? atsScore : 'N/A'}</div>
+              <div><div className='font-bold'>Missed Keywords:</div> {missedKeyWords.length > 0 ? missedKeyWords.join(', ') : 'None'}</div>
+            </div>
           </div>
         </form>
 
