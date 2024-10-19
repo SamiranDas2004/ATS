@@ -44,7 +44,7 @@ router('/about')
         if (response.data.atsScore.score <= 15) {
           setScoreStatus("[Oh Shit you Fucked Up]");
         } else if (response.data.atsScore.score > 15 && response.data.atsScore.score <= 39) {
-          setScoreStatus("[You Are in Safe Zone]");
+          setScoreStatus("[You Are in Safe Zone best of luck]");
         } else if (response.data.atsScore.score > 39 && response.data.atsScore.score <= 50) {
           setScoreStatus("[You Are in Safe Zone]");
         } else if (response.data.atsScore.score > 50 && response.data.atsScore.score <= 70) {
@@ -71,7 +71,7 @@ router('/about')
     <div className="min-h-screen bg-gray-900">
       <header className=" text-white py-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Resume ATS Checker</h1>
+          <h1  className="text-3xl font-bold"> <Link to='/'> ATS Checker</Link></h1>
           <nav className="flex space-x-6">
             <Link to="/about" className="hover:underline font-bold">About</Link>
             <Link to="/developer" className="hover:underline font-bold">Developer</Link>
@@ -119,7 +119,7 @@ router('/about')
               </button>
               <div className="mt-4">
                 <div className='font-bold'>
-                  Your ATS score is: {atsScore !== null ? atsScore + 15 : 'N/A'} {scoreStatus}
+                  Your ATS score is: {atsScore !== null ? atsScore + 15+"%" : 'N/A'} {scoreStatus}
                 </div>
 
                 <div className="mt-4">

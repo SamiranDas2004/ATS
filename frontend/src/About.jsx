@@ -7,7 +7,7 @@ function About() {
       {/* Header should be outside the centered content */}
       <header className="text-white py-4 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Resume ATS Checker</h1>
+        <h1  className="text-3xl font-bold"> <Link to='/'> ATS Checker</Link></h1>
           <nav className="flex space-x-6">
             <Link to="/about" className="hover:underline font-bold">About</Link>
             <Link to="/developer" className="hover:underline font-bold">Developer</Link>
