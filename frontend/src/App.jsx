@@ -32,7 +32,7 @@ router('/about')
       setLoading(true); // Set loading to true when starting the request
 
       try {
-        const response = await axios.post('https://ats-qtqd.onrender.com/', formData, {
+        const response = await axios.post('https://ats-qtqd.onrender.com/api/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
